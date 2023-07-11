@@ -6141,20 +6141,22 @@ void MainWindow::closeEvent(QCloseEvent* event)
 	}
 	else // ...otherwise confirm
 	{
-		QMessageBox message_box( QMessageBox::Question,
-								 tr("Quit"),
-								 tr("Are you sure you want to quit?"),
-								 QMessageBox::Ok | QMessageBox::Cancel,
-								 this);
+		event->accept();
+
+		// QMessageBox message_box( QMessageBox::Question,
+		// 						 tr("Quit"),
+		// 						 tr("Are you sure you want to quit?"),
+		// 						 QMessageBox::Ok | QMessageBox::Cancel,
+		// 						 this);
 		
-		if ( message_box.exec() == QMessageBox::Ok )
-		{
-			event->accept();
-		}
-		else
-		{
-			event->ignore();
-		}
+		// if ( message_box.exec() == QMessageBox::Ok )
+		// {
+		// 	event->accept();
+		// }
+		// else
+		// {
+		// 	event->ignore();
+		// }
 	}
 
 	if (s_autoSaveGuiElementPos)
