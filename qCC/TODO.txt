@@ -60,8 +60,10 @@ qAnimation plugin:
 qFacets plugin:
 [*] Option to export 3D polygons (facets) in SHP files
 [*] Add the facet perimeter to the set of exported values
+[*] Export more metrics in CSV/SHP DB files (perimeter, etc.) (see https://www.cloudcompare.org/forum/viewtopic.php?p=28216#p28216)
 
 Various:
+[*] Batch export several polylines CSV 'height profiles' (see https://www.cloudcompare.org/forum/viewtopic.php?p=28189)
 [*] Rasterize tool (GUI)
 	- choose the exported raster format (https://www.cloudcompare.org/forum/viewtopic.php?t=6378)
 	- export images in the Rasterize tool with a custom color ramp (https://www.cloudcompare.org/forum/viewtopic.php?f=10&t=6023)
