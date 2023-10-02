@@ -855,11 +855,6 @@ bool ccComparisonDlg::computeDistances()
 
 	case CLOUDMESH_DIST: //cloud-mesh
 
-		if (multiThread && maxDistCheckBox->isChecked())
-		{
-			ccLog::Warning("[Cloud/Mesh comparison] Max search distance is not supported in multi-thread mode! Switching to single thread mode...");
-		}
-
 		//setup parameters
 		{
 			c2mParams.octreeLevel = static_cast<unsigned char>(octreeLevel);
