@@ -4,7 +4,19 @@ CloudCompare Version History
 v2.13.alpha (???) - (??/??/????)
 ----------------------
 - - New features:
+
+	- Segment
+		- new button in the toolbar to export the current selection as a new cloud or mesh (without needing to close the tool)
+
+	- New section in the Properties when a cloud is selected: "Draw normals as lines"
+		- one check box to toggle the display
+		- one double spin box to choose the length of the normals (1 by default)
+		- one combo box to choose the color of the normals
+	
+
 	- New command line option:
+		- SF_ADD_ID allows to add the index of the point as a scalar field (initially as a float32, so there is a loss of accuracy for values above 16777215)
+			- the AS_INT parameter allows to store the index as a raw uint32, allowing index values from 0 up to (2**32-1)
 		- FLIP_TRI (to flip the order of the triangle vertices of all opened meshes)
 		- SF_OP_SF {SF 1 name or index} {operation} {SF 2 name or index}
 			- to compute an arithmetic operation between two scalar fields (add, sub, mult, div)
@@ -75,6 +87,9 @@ v2.13.alpha (???) - (??/??/????)
 		- fits a 2D circle on a 3D point cloud (thanks to https://github.com/truebelief)
 		- works also on cylinders
 
+	- Edit > Normals > Set SF(s) as normal (or Edit > Scalar fields > Set SF(s) as normal)
+		- allows to set normals from scalar fields (or 0 or 1)
+
 	- New plugin: q3DMASC
 		- 3DMASC is an advanced plugin for 3D point cloud classification, that uses Multiple Attributes, Scales and Clouds.
 		  It is possible to use it with the GUI but also to call it with the command line.
@@ -116,6 +131,9 @@ v2.13.alpha (???) - (??/??/????)
 		- new tab to define the transformation as a rotation from a vector to another one (+ a translation)
 		- ability to paste the axes, triplet of angles and translation vectors from the clipboard (3 numerical values separated by whitespaces, commas or semicolons)
 		- the tool now tries to handle rotation scaling separately (with a dedicated field, assuming it's the same scaling for all dimensions)
+
+	- Edit > Waveform > 2D Waveform viewer
+		- the point which waveform is edited is now spoted in the 3D view and information is displayed as in with the pickin tool
 
 	- Multi-threading
 		- If possible, CC will now try to use less threads/cores than the maximum number, so as to let the application breath
@@ -270,6 +288,14 @@ v2.13.alpha (???) - (??/??/????)
 
 	- Some more basic statistics are displayed in the Console when using the 'Edit > SF > Compute stat. params' tool
 		- number of valid values, sum of all valid values and squared values, average, RMS
+
+	- Connected Components Extraction:
+		- the parameters are now semi-persistent (= maintained as long as CC is running)
+
+	- Cloud-to-primitive distances:
+		- refreshed dialog
+		- when launching the Cloud-to-mesh distance tool with a primitive as mesh, CC will now suggest the user to use
+			the Cloud-to-primitive distance tool instead
 
 - Bug fix:
 	- PCD: when transforming a cloud with a sensor (either manually, or via a registration tool, or via Edit > Apply Tranformation) and then exporting

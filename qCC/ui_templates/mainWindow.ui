@@ -152,8 +152,9 @@
      <addaction name="actionAddClassificationSF"/>
      <addaction name="actionAddIdField"/>
      <addaction name="actionExportCoordToSF"/>
-     <addaction name="actionExportNormalToSF"/>
      <addaction name="actionSetSFAsCoord"/>
+     <addaction name="actionExportNormalToSF"/>
+     <addaction name="actionSetSFsAsNormal"/>
      <addaction name="actionInterpolateSFs"/>
      <addaction name="actionSplitCloudUsingSF"/>
      <addaction name="actionScalarFieldArithmetic"/>
@@ -202,7 +203,9 @@
      <addaction name="actionInvertNormals"/>
      <addaction name="menuOrientNormals"/>
      <addaction name="menuConvert_to"/>
+     <addaction name="separator"/>
      <addaction name="actionExportNormalToSF"/>
+     <addaction name="actionSetSFsAsNormal"/>
      <addaction name="separator"/>
      <addaction name="actionShiftPointsAlongNormals"/>
      <addaction name="separator"/>
@@ -3168,6 +3171,11 @@ The active scalar field should have integer values.</string>
     <string>Fits a circle on the selected cloud</string>
    </property>
   </action>
+  <action name="actionSetSFsAsNormal">
+   <property name="text">
+    <string>Set SF(s) as normal</string>
+   </property>
+  </action>
  </widget>
  <customwidgets>
   <customwidget>
@@ -3182,7 +3190,6 @@ The active scalar field should have integer values.</string>
   </customwidget>
  </customwidgets>
  <resources>
-  <include location="../icons.qrc"/>
   <include location="../icons.qrc"/>
  </resources>
  <connections>

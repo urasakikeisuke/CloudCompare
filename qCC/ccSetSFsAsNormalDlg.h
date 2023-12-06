@@ -1,3 +1,5 @@
+#pragma once
+
 //##########################################################################
 //#                                                                        #
 //#                              CLOUDCOMPARE                              #
@@ -11,49 +13,37 @@
 //#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          #
 //#  GNU General Public License for more details.                          #
 //#                                                                        #
-//#          COPYRIGHT: EDF R&D / TELECOM ParisTech (ENST-TSI)             #
+//#                   COPYRIGHT: CloudCompare project                      #
 //#                                                                        #
 //##########################################################################
 
-#include "ccLabelingDlg.h"
+#include <ui_setSFAsNormalsDlg.h>
 
-#include <DgmOctree.h>
+//Qt
+#include <QDialog>
 
-ccLabelingDlg::ccLabelingDlg(QWidget* parent/*=nullptr*/)
-	: QDialog(parent, Qt::Tool)
-	, Ui::LabelingDialog()
+class ccPointCloud;
+
+//! Let the user choose up to 3 scalar fields (to be used as Normal components)
+class ccSetSFsAsNormalDialog : public QDialog, public Ui::SetSFsAsNormalDialog
 {
-	setupUi(this);
+	Q_OBJECT
 
-	octreeLevelSpinBox->setMaximum(CCCoreLib::DgmOctree::MAX_OCTREE_LEVEL);
-}
+public:
+	
+	//! Default constructor
+	ccSetSFsAsNormalDialog(const ccPointCloud* cloud, QWidget* parent = nullptr);
 
-int ccLabelingDlg::getOctreeLevel()
-{
-	return octreeLevelSpinBox->value();
-}
+	//! No SF index
+	static const int SF_INDEX_NO   = -1;
+	//! 'Zero' SF index
+	static const int SF_INDEX_ZERO = -2;
+	//! 'One' SF index
+	static const int SF_INDEX_ONE  = -3;
 
-int ccLabelingDlg::getMinPointsNb()
-{
-	return minPtsSpinBox->value();
-}
+	//! Sets the 3 SF indexes
+	void setSFIndexes(int sf1Index, int sf2Index, int sf3Index);
 
-bool ccLabelingDlg::randomColors()
-{
-	return (randomColorsCheckBox->checkState() == Qt::Checked);
-}
-
-void ccLabelingDlg::setOctreeLevel(int octreeLevel)
-{
-	octreeLevelSpinBox->setValue(octreeLevel);
-}
-
-void ccLabelingDlg::setMinPointsNb(int minPointsNb)
-{
-	minPtsSpinBox->setValue(minPointsNb);
-}
-
-void ccLabelingDlg::setRandomColors(bool state)
-{
-	randomColorsCheckBox->setChecked(state);
-}
+	//! Returns the 3 SF indexes
+	void getSFIndexes(int& sf1Index, int& sf2Index, int& sf3Index) const;
+};
