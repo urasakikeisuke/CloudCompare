@@ -52,8 +52,8 @@
 
 //default position of each columns in the to-be-aligned and ref. table widgets
 static const int XYZ_COL_INDEX			= 0;
-static const int RMS_COL_INDEX			= 3;
-static const int DEL_BUTTON_COL_INDEX	= 4;
+static const int RMS_COL_INDEX			= 6;
+static const int DEL_BUTTON_COL_INDEX	= 7;
 
 //minimum number of pairs to let the user click on the align button
 static const unsigned MIN_PAIRS_COUNT = 3;
@@ -968,7 +968,14 @@ bool ccPointPairRegistrationDlg::addReferencePoint(CCVector3d& Pin, ccHObject* e
 				bool shiftEnabled = m_alignedEntities.isShifted;
 				CCVector3d Pshift = m_alignedEntities.shift;
 				double scale = 1.0;
-				if (ccGlobalShiftManager::Handle(Pin, 0, ccGlobalShiftManager::NO_DIALOG_AUTO_SHIFT, shiftEnabled, Pshift,  nullptr, &scale))
+				if (ccGlobalShiftManager::Handle(	Pin,
+													0.0,
+													ccGlobalShiftManager::NO_DIALOG_AUTO_SHIFT,
+													shiftEnabled,
+													Pshift,
+													nullptr,
+													&scale)
+					)
 				{
 					m_refPoints.setGlobalShift(Pshift);
 					m_refPoints.setGlobalScale(scale);
@@ -1198,8 +1205,16 @@ void ccPointPairRegistrationDlg::showReferenceEntities(bool state)
 	}
 }
 
-bool ccPointPairRegistrationDlg::callHornRegistration(CCCoreLib::PointProjectionTools::Transformation& trans, double& rms, bool autoUpdateTab)
+bool ccPointPairRegistrationDlg::callHornRegistration(	CCCoreLib::PointProjectionTools::Transformation& trans,
+														double& rms,
+														bool autoUpdateTab,
+														QStringList* report/*=nullptr*/ )
 {
+	if (report)
+	{
+		report->clear();
+	}
+
 	if (m_alignedEntities.empty())
 	{
 		assert(false);
@@ -1237,6 +1252,9 @@ bool ccPointPairRegistrationDlg::callHornRegistration(CCCoreLib::PointProjection
 		case 3:
 			filters |= CCCoreLib::RegistrationTools::SKIP_RXY;
 			break;
+		case 4:
+			filters |= CCCoreLib::RegistrationTools::SKIP_ROTATION;
+			break;
 		default:
 			//nothing to do
 			break;
@@ -1251,32 +1269,109 @@ bool ccPointPairRegistrationDlg::callHornRegistration(CCCoreLib::PointProjection
 
 		if (filters != 0)
 		{
-			CCCoreLib::RegistrationTools::FilterTransformation(trans, filters, trans);
+			CCCoreLib::RegistrationTools::FilterTransformation(	trans,
+																filters,
+																m_alignedPoints.computeGravityCenter(),
+																m_refPoints.computeGravityCenter(),
+																trans);
 		}
 	}
 
 	//compute RMS
 	rms = CCCoreLib::HornRegistrationTools::ComputeRMS(&m_alignedPoints, &m_refPoints, trans);
 
-	if (autoUpdateTab)
+	if (autoUpdateTab || report)
 	{
-		//display resulting RMS in colums
+		//display resulting RMS in the right column
 		if (rms >= 0)
 		{
 			assert(m_alignedPoints.size() == m_refPoints.size());
+
+			if (report)
+			{
+				// add header (first column is the timestamp)
+				report->append("; Ref.name; Ref.x; Ref.y; Ref.z; Aligned.name; Aligned.x; Aligned.y; Aligned.z; Delta X; Delta Y; Delta Z; Distance");
+			}
+
 			for (unsigned i = 0; i < m_alignedPoints.size(); ++i)
 			{
 				const CCVector3* Ri = m_refPoints.getPoint(i);
+				CCVector3d Rid = Ri->toDouble();
 				const CCVector3* Li = m_alignedPoints.getPoint(i);
 				CCVector3d Lit = trans.apply(*Li);
-				double dist = (Ri->toDouble() - Lit).norm();
+				double dist = (Rid - Lit).norm();
 
-				QTableWidgetItem* itemA = new QTableWidgetItem();
-				itemA->setData(Qt::EditRole, dist);
-				alignedPointsTableWidget->setItem(i, RMS_COL_INDEX, itemA);
-				QTableWidgetItem* itemR = new QTableWidgetItem();
-				itemR->setData(Qt::EditRole, dist);
-				refPointsTableWidget->setItem(i, RMS_COL_INDEX, itemR);
+				if (report)
+				{
+					// create a new line in the report
+					QString alignedName;
+					auto* alignedHeader = alignedPointsTableWidget->verticalHeaderItem(static_cast<int>(i));
+					if (alignedHeader)
+					{
+						alignedName = alignedHeader->text();
+					}
+					else
+					{
+						assert(false);
+						alignedName = QString("A%1").arg(i);
+					}
+
+					QString refName;
+					auto* refHeader = refPointsTableWidget->verticalHeaderItem(static_cast<int>(i));
+					if (refHeader)
+					{
+						refName = refHeader->text();
+					}
+					else
+					{
+						assert(false);
+						refName = QString("R%1").arg(i);
+					}
+
+					//first column timestamp
+					QString reportLine = QString(";%1; %2; %3; %4").arg(refName)
+						.arg(Ri->x)
+						.arg(Ri->y)
+						.arg(Ri->z);
+
+					reportLine += QString("; %1; %2; %3; %4").arg(alignedName)
+						.arg(Lit.x)
+						.arg(Lit.y)
+						.arg(Lit.z);
+
+					//errors along axis
+					for (unsigned coordIndex = 0; coordIndex < 3; ++coordIndex)
+					{
+						reportLine += QString("; %1").arg(Lit[coordIndex]- Rid[coordIndex]);
+					}
+
+					reportLine += QString("; %1").arg(dist);
+
+					report->append(reportLine);
+				}
+
+				if (autoUpdateTab)
+				{
+					QTableWidgetItem* itemA = new QTableWidgetItem();
+					itemA->setData(Qt::EditRole, dist);
+					alignedPointsTableWidget->setItem(i, RMS_COL_INDEX, itemA);
+
+					QTableWidgetItem* itemR = new QTableWidgetItem();
+					itemR->setData(Qt::EditRole, dist);
+					refPointsTableWidget->setItem(i, RMS_COL_INDEX, itemR);
+
+					//update errors along Axis
+					for (unsigned j = 0; j < 3; ++j) {
+						double diffAlongAxis = Lit[j] - Rid[j];
+						QTableWidgetItem* itemAAlongAxis = new QTableWidgetItem();
+						itemAAlongAxis->setData(Qt::EditRole, diffAlongAxis);
+						alignedPointsTableWidget->setItem(i, RMS_COL_INDEX - 3 + j, itemAAlongAxis);
+
+						QTableWidgetItem* itemRAlongAxis = new QTableWidgetItem();
+						itemRAlongAxis->setData(Qt::EditRole, diffAlongAxis);
+						refPointsTableWidget->setItem(i, RMS_COL_INDEX - 3 + j, itemRAlongAxis);
+					}
+				}
 			}
 		}
 		else
@@ -1291,10 +1386,10 @@ bool ccPointPairRegistrationDlg::callHornRegistration(CCCoreLib::PointProjection
 
 void ccPointPairRegistrationDlg::clearRMSColumns()
 {
-	for (int i=0; alignedPointsTableWidget->rowCount(); ++i)
-		alignedPointsTableWidget->setItem(i,RMS_COL_INDEX,new QTableWidgetItem());
-	for (int i=0; refPointsTableWidget->rowCount(); ++i)
-		refPointsTableWidget->setItem(i,RMS_COL_INDEX,new QTableWidgetItem());
+	for (int i = 0; alignedPointsTableWidget->rowCount(); ++i)
+		alignedPointsTableWidget->setItem(i, RMS_COL_INDEX, new QTableWidgetItem());
+	for (int i = 0; refPointsTableWidget->rowCount(); ++i)
+		refPointsTableWidget->setItem(i, RMS_COL_INDEX, new QTableWidgetItem());
 }
 
 void ccPointPairRegistrationDlg::resetTitle()
@@ -1335,7 +1430,8 @@ void ccPointPairRegistrationDlg::updateAlignInfo()
 void ccPointPairRegistrationDlg::align()
 {
 	CCCoreLib::PointProjectionTools::Transformation trans;
-	double rms;
+	double rms = std::numeric_limits<double>::quiet_NaN();
+
 
 	//reset title
 	resetTitle();
@@ -1363,17 +1459,19 @@ void ccPointPairRegistrationDlg::align()
 				trans.R.scale(trans.s);
 
 			QString scaleString = QString("Scale: %1").arg(trans.s);
-			ccLog::Print(QString("[PointPairRegistration] ")+scaleString);
+			ccLog::Print(QString("[PointPairRegistration] ") + scaleString);
 		}
 		else
 		{
-			ccLog::Print(QString("[PointPairRegistration] Scale: fixed (1.0)"));
+			ccLog::Print(tr("[PointPairRegistration] Scale: fixed (1.0)"));
 		}
 
 		ccGLMatrix transMat = FromCCLibMatrix<double, float>(trans.R, trans.T);
 		//...virtually
 		for (auto it = m_alignedEntities.begin(); it != m_alignedEntities.end(); ++it)
+		{
 			it.key()->setGLTransformation(transMat);
+		}
 		m_alignedPoints.setGLTransformation(transMat);
 		//DGM: we have to 'counter-scale' the markers (otherwise they might appear very big or very small!)
 		for (unsigned i = 0; i < m_alignedPoints.getChildrenNumber(); ++i)
@@ -1381,7 +1479,7 @@ void ccPointPairRegistrationDlg::align()
 			ccHObject* child = m_alignedPoints.getChild(i);
 			if (child->isA(CC_TYPES::LABEL_2D))
 			{
-				static_cast<cc2DLabel*>(child)->setRelativeMarkerScale(1.0f/static_cast<float>(trans.s));
+				static_cast<cc2DLabel*>(child)->setRelativeMarkerScale(static_cast<float>(1.0 / trans.s));
 			}
 		}
 
@@ -1441,16 +1539,24 @@ void ccPointPairRegistrationDlg::apply()
 {
 	CCCoreLib::PointProjectionTools::Transformation trans;
 	double rms = -1.0;
-	
-	if (callHornRegistration(trans, rms, false))
+	QStringList report;
+
+	if (callHornRegistration(trans, rms, false, &report))
 	{
 		QStringList summary;
 		if (rms >= 0)
 		{
 			QString rmsString = QString("Final RMS: %1").arg(rms);
-			ccLog::Print(QString("[PointPairRegistration] ")+rmsString);
+			report << rmsString;
 			summary << rmsString;
 			summary << "----------------";
+
+			//output the report to the Console/Log
+			ccLog::Print("[PointPairRegistration] Final alignment report:");
+			for (const QString& line : report)
+			{
+				ccLog::Print(line);
+			}
 		}
 
 		//apply (scaled) transformation (if not fixed)
@@ -1521,7 +1627,14 @@ void ccPointPairRegistrationDlg::apply()
 			CCVector3d Pshift = m_refPoints.getGlobalShift();
 			double scale = m_refPoints.getGlobalScale();
 			CCVector3d Pin = m_refPoints.toGlobal3d(*m_refPoints.getPoint(0));
-			if (ccGlobalShiftManager::Handle(Pin, 0, ccGlobalShiftManager::ALWAYS_DISPLAY_DIALOG, true, Pshift, nullptr, &scale))
+			if (ccGlobalShiftManager::Handle(	Pin,
+												0.0,
+												ccGlobalShiftManager::ALWAYS_DISPLAY_DIALOG,
+												true,
+												Pshift,
+												nullptr,
+												&scale)
+				)
 			{
 				referenceIsShifted = true;
 				referenceShift = Pshift;

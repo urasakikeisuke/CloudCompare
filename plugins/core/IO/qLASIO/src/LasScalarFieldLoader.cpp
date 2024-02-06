@@ -198,7 +198,7 @@ CC_FILE_ERROR LasScalarFieldLoader::handleExtraScalarFields(const laszip_point& 
 
 	for (const LasExtraScalarField& extraField : m_extraScalarFields)
 	{
-		ScalarType finalValues[3]{0.0};
+		ScalarType finalValues[3]{0};
 
 		const CC_FILE_ERROR err = parseExtraScalarField(extraField, currentPoint, finalValues);
 		if (err != CC_FERR_NO_ERROR)
@@ -208,7 +208,10 @@ CC_FILE_ERROR LasScalarFieldLoader::handleExtraScalarFields(const laszip_point& 
 
 		for (unsigned dimIndex = 0; dimIndex < extraField.numElements(); ++dimIndex)
 		{
-			extraField.scalarFields[dimIndex]->addElement(finalValues[dimIndex]);
+			if (extraField.scalarFields[dimIndex])
+			{
+				extraField.scalarFields[dimIndex]->addElement(finalValues[dimIndex]);
+			}
 		}
 	}
 	return CC_FERR_NO_ERROR;
@@ -422,7 +425,8 @@ void LasScalarFieldLoader::handleOptionsFor(const LasExtraScalarField& extraFiel
 				outputValues[dimIndex] = static_cast<ScalarType>(inputValues[dimIndex]);
 			}
 		}
-		else if (extraField.scaleIsRelevant())
+
+		if (extraField.scaleIsRelevant())
 		{
 			double scaledValue     = (inputValues[dimIndex] * extraField.scales[dimIndex]) + (extraField.offsets[dimIndex]);
 			outputValues[dimIndex] = static_cast<ScalarType>(scaledValue);

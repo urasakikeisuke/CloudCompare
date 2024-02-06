@@ -151,17 +151,17 @@ CC_FILE_ERROR LasIOFilter::loadFile(const QString&  fileName,
 
 	std::vector<LasScalarField> availableScalarFields = LasScalarField::ForPointFormat(laszipHeader->point_data_format);
 
-	std::vector<LasExtraScalarField> availableEXtraScalarFields = LasExtraScalarField::ParseExtraScalarFields(*laszipHeader);
+	std::vector<LasExtraScalarField> availableExtraScalarFields = LasExtraScalarField::ParseExtraScalarFields(*laszipHeader);
 
 	std::unique_ptr<FileInfo> infoOfCurrentFile = std::make_unique<FileInfo>();
 	infoOfCurrentFile->version.minorVersion     = laszipHeader->version_minor;
 	infoOfCurrentFile->version.pointFormat      = laszipHeader->point_data_format;
-	infoOfCurrentFile->extraScalarFields        = availableEXtraScalarFields;
+	infoOfCurrentFile->extraScalarFields        = availableExtraScalarFields;
 
 	bool fileContentIsDifferentFromPrevious = (m_infoOfLastOpened && (*m_infoOfLastOpened != *infoOfCurrentFile));
 
 	m_openDialog.setInfo(laszipHeader->version_minor, laszipHeader->point_data_format, pointCount);
-	m_openDialog.setAvailableScalarFields(availableScalarFields, availableEXtraScalarFields);
+	m_openDialog.setAvailableScalarFields(availableScalarFields, availableExtraScalarFields);
 	m_infoOfLastOpened = std::move(infoOfCurrentFile);
 
 	// The idea is that when Loading a file (as opposed to tiling one)
@@ -202,14 +202,14 @@ CC_FILE_ERROR LasIOFilter::loadFile(const QString&  fileName,
 		return TileLasReader(laszipReader, fileName, m_openDialog.tilingOptions());
 	}
 
-	std::array<LasExtraScalarField, 3> extraScalarFieldsToLoadAsNormals = m_openDialog.getExtraFieldsToBeLoadedAsNormals(availableEXtraScalarFields);
+	std::array<LasExtraScalarField, 3> extraScalarFieldsToLoadAsNormals = m_openDialog.getExtraFieldsToBeLoadedAsNormals(availableExtraScalarFields);
 	bool                               haveToLoadNormals                = std::any_of(extraScalarFieldsToLoadAsNormals.begin(),
                                          extraScalarFieldsToLoadAsNormals.end(),
                                          [](const LasExtraScalarField& e)
                                          {
                                              return e.type != LasExtraScalarField::DataType::Undocumented;
                                          });
-	m_openDialog.filterOutNotChecked(availableScalarFields, availableEXtraScalarFields);
+	m_openDialog.filterOutNotChecked(availableScalarFields, availableExtraScalarFields);
 
 	auto pointCloud = std::make_unique<ccPointCloud>(QFileInfo(fileName).fileName());
 	if (!pointCloud->reserve(pointCount))
@@ -247,7 +247,7 @@ CC_FILE_ERROR LasIOFilter::loadFile(const QString&  fileName,
 	}
 
 	LasScalarFieldLoader loader(availableScalarFields,
-	                            availableEXtraScalarFields,
+	                            availableExtraScalarFields,
 	                            *pointCloud);
 
 	loader.setIgnoreFieldsWithDefaultValues(m_openDialog.shouldIgnoreFieldsWithDefaultValues());
@@ -267,19 +267,17 @@ CC_FILE_ERROR LasIOFilter::loadFile(const QString&  fileName,
 	ccProgressDialog progressDialog(true, parameters.parentWidget);
 	progressDialog.setMethodTitle("Loading LAS points");
 	progressDialog.setInfo("Loading points");
-	CCCoreLib::NormalizedProgress normProgress(&progressDialog, pointCount);
-	progressDialog.start();
+	QScopedPointer<CCCoreLib::NormalizedProgress> normProgress;
+	if (parameters.parentWidget)
+	{
+		normProgress.reset(new CCCoreLib::NormalizedProgress(&progressDialog, pointCount));
+		progressDialog.start();
+	}
 
 	CC_FILE_ERROR error{CC_FERR_NO_ERROR};
 	CCVector3d    globalShift(0, 0, 0);
 	for (unsigned i = 0; i < pointCount; ++i)
 	{
-		if (progressDialog.isCancelRequested())
-		{
-			error = CC_FERR_CANCELED_BY_USER;
-			break;
-		}
-
 		if (laszip_read_point(laszipReader))
 		{
 			error = CC_FERR_THIRD_PARTY_LIB_FAILURE; // error will be logged later
@@ -366,18 +364,27 @@ CC_FILE_ERROR LasIOFilter::loadFile(const QString&  fileName,
 				{
 					continue;
 				}
-				ScalarType normalsValues[3] = {0.0};
-				error                       = loader.parseExtraScalarField(extraField, *laszipPoint, normalsValues);
+				ScalarType normalsValues[3]{0, 0, 0};
+				error = loader.parseExtraScalarField(extraField, *laszipPoint, normalsValues);
 				if (error != CC_FERR_NO_ERROR)
 				{
 					break;
 				}
 				normal[normalIndex] = normalsValues[0];
 			}
+
+			if (error != CC_FERR_NO_ERROR)
+			{
+				break;
+			}
 			pointCloud->addNorm(normal);
 		}
 
-		normProgress.oneStep();
+		if (normProgress && !normProgress->oneStep())
+		{
+			error = CC_FERR_CANCELED_BY_USER;
+			break;
+		}
 	}
 
 	for (const LasScalarField& field : loader.standardFields())
@@ -458,12 +465,12 @@ CC_FILE_ERROR LasIOFilter::loadFile(const QString&  fileName,
 	pointCloud->showColors(pointCloud->hasColors());
 	pointCloud->showSF(!pointCloud->hasColors() && pointCloud->hasDisplayedScalarField());
 
-	for (LasExtraScalarField& extraField : availableEXtraScalarFields)
+	for (LasExtraScalarField& extraField : availableExtraScalarFields)
 	{
 		extraField.resetScalarFieldsPointers();
 	}
 
-	LasMetadata::SaveMetadataInto(*laszipHeader, *pointCloud, availableEXtraScalarFields);
+	LasMetadata::SaveMetadataInto(*laszipHeader, *pointCloud, availableExtraScalarFields);
 
 	container.addChild(pointCloud.release());
 
@@ -593,17 +600,9 @@ CC_FILE_ERROR LasIOFilter::saveToFile(ccHObject* entity, const QString& filename
 	saveDialog.setOptimalScale(optimalScale);
 
 	// Find the best version for the file or try to use the one from original file
-	LasDetails::LasVersion bestVersion = LasDetails::SelectBestVersion(*pointCloud);
 	LasDetails::LasVersion savedVersion;
-	if (LasMetadata::LoadLasVersionFrom(*pointCloud, savedVersion))
-	{
-		// We do have a version we saved from the original file,
-		// however we don't want to downgrade it.
-		if (bestVersion.minorVersion < savedVersion.minorVersion && bestVersion.pointFormat < savedVersion.pointFormat)
-		{
-			bestVersion = savedVersion;
-		}
-	}
+	bool                   hasSavedVersion = LasMetadata::LoadLasVersionFrom(*pointCloud, savedVersion);
+	LasDetails::LasVersion bestVersion     = LasDetails::SelectBestVersion(*pointCloud, hasSavedVersion ? savedVersion.minorVersion : 0);
 
 	saveDialog.setVersionAndPointFormat(bestVersion);
 
@@ -650,18 +649,24 @@ CC_FILE_ERROR LasIOFilter::saveToFile(ccHObject* entity, const QString& filename
 			const char*    sfName = sf->getName();
 			bool           found  = false;
 			for (auto& el : params.standardFields)
+			{
 				if (strcmp(sfName, el.name()) == 0)
 				{
 					found = true;
 					break;
 				}
+			}
 			if (!found)
+			{
 				for (auto& el : params.extraFields)
+				{
 					if (strcmp(sfName, el.scalarFields[0]->getName()) == 0)
 					{
 						found = true;
 						break;
 					}
+				}
+			}
 			if (!found)
 			{
 				ccLog::Print("[LAS] scalar field " + QString(sfName) + " will be saved automatically in the extra fields of the output file");
@@ -721,7 +726,7 @@ CC_FILE_ERROR LasIOFilter::saveToFile(ccHObject* entity, const QString& filename
 		return error;
 	}
 
-	if (saver.savesWaveforms())
+	if (saver.canSaveWaveforms())
 	{
 		const ccPointCloud::SharedFWFDataContainer& fwfData = pointCloud->fwfData();
 		QFileInfo                                   info(filename);

@@ -41,6 +41,13 @@ struct CommandLoad : public ccCommandLineInterface::Command
 	bool process(ccCommandLineInterface& cmd) override;
 };
 
+struct CommandLoadCommandFile : public ccCommandLineInterface::Command
+{
+	CommandLoadCommandFile();
+
+	bool process(ccCommandLineInterface& cmd) override;
+};
+
 struct CommandClearNormals : public ccCommandLineInterface::Command
 {
 	CommandClearNormals();
@@ -202,6 +209,13 @@ struct CommandSetActiveSF : public ccCommandLineInterface::Command
 	bool process(ccCommandLineInterface& cmd) override;
 };
 
+struct CommandSetGlobalShift : public ccCommandLineInterface::Command
+{
+	CommandSetGlobalShift();
+
+	bool process(ccCommandLineInterface& cmd) override;
+};
+
 struct CommandRemoveAllSFs : public ccCommandLineInterface::Command
 {
 	CommandRemoveAllSFs();
@@ -237,7 +251,14 @@ struct CommandRemoveScanGrids : public ccCommandLineInterface::Command
 	CommandRemoveScanGrids();
 
 	bool process(ccCommandLineInterface& cmd) override;
-}; 
+};
+
+struct CommandRemoveSensors : public ccCommandLineInterface::Command
+{
+	CommandRemoveSensors();
+
+	bool process(ccCommandLineInterface& cmd) override;
+};
 
 struct CommandMatchBBCenters : public ccCommandLineInterface::Command
 {
@@ -426,6 +447,13 @@ struct CommandColorInterpolation : public ccCommandLineInterface::Command
 	bool process(ccCommandLineInterface& cmd) override;
 };
 
+struct CommandRenameEntities : public ccCommandLineInterface::Command
+{
+	CommandRenameEntities();
+
+	bool process(ccCommandLineInterface& cmd) override;
+};
+
 struct CommandSFRename : public ccCommandLineInterface::Command
 {
 	CommandSFRename();
@@ -501,6 +529,13 @@ struct CommandAutoSave : public ccCommandLineInterface::Command
 struct CommandLogFile : public ccCommandLineInterface::Command
 {
 	CommandLogFile();
+
+	bool process(ccCommandLineInterface& cmd) override;
+};
+
+struct CommandSelectEntities : public ccCommandLineInterface::Command
+{
+	CommandSelectEntities();
 
 	bool process(ccCommandLineInterface& cmd) override;
 };

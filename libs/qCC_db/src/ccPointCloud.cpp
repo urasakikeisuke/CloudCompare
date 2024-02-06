@@ -604,6 +604,9 @@ const ccPointCloud& ccPointCloud::operator +=(ccPointCloud* addedCloud)
 
 const ccPointCloud& ccPointCloud::append(ccPointCloud* addedCloud, unsigned pointCountBefore, bool ignoreChildren/*=false*/)
 {
+	//Clears the LOD structure (and potentially stop its construction)
+	clearLOD();
+
 	assert(addedCloud);
 
 	unsigned addedPoints = addedCloud->size();
@@ -1106,8 +1109,6 @@ const ccPointCloud& ccPointCloud::append(ccPointCloud* addedCloud, unsigned poin
 
 	//We should update the VBOs (just in case)
 	releaseVBOs();
-	//As well as the LOD structure
-	clearLOD();
 
 	return *this;
 }
@@ -1923,6 +1924,9 @@ void ccPointCloud::applyGLTransformation(const ccGLMatrix& trans)
 
 void ccPointCloud::applyRigidTransformation(const ccGLMatrix& trans)
 {
+	//Clears the LOD structure (and potentially stop its construction)
+	clearLOD();
+
 	//transparent call
 	ccGenericPointCloud::applyGLTransformation(trans);
 
@@ -2061,6 +2065,31 @@ void ccPointCloud::scale(PointCoordinateType fx, PointCoordinateType fy, PointCo
 
 	invalidateBoundingBox();
 
+	//update the normals (if any)
+	if (hasNormals())
+	{
+		//only if one of the scale coefficients is negative
+		if (fx < 0 || fy < 0 || fz < 0)
+		{
+			PointCoordinateType signX = (fx < 0 ? -CCCoreLib::PC_ONE : CCCoreLib::PC_ONE);
+			PointCoordinateType signY = (fy < 0 ? -CCCoreLib::PC_ONE : CCCoreLib::PC_ONE);
+			PointCoordinateType signZ = (fz < 0 ? -CCCoreLib::PC_ONE : CCCoreLib::PC_ONE);
+
+			for (CompressedNormType& n : *m_normals)
+			{
+				CCVector3 N;
+				ccNormalCompressor::Decompress(n, N.u);
+				N.x *= signX;
+				N.y *= signY;
+				N.z *= signZ;
+				n = ccNormalCompressor::Compress(N.u);
+			}
+
+			//we must update the VBOs
+			normalsHaveChanged();
+		}
+	}
+
 	//same thing for the octree
 	ccOctree::Shared octree = getOctree();
 	if (octree)
@@ -2165,16 +2194,16 @@ void ccPointCloud::scale(PointCoordinateType fx, PointCoordinateType fy, PointCo
 
 void ccPointCloud::invertNormals()
 {
-	if (!hasNormals())
-		return;
-
-	for (CompressedNormType& n : *m_normals)
+	if (hasNormals())
 	{
-		ccNormalCompressor::InvertNormal(n);
-	}
+		for (CompressedNormType& n : *m_normals)
+		{
+			ccNormalCompressor::InvertNormal(n);
+		}
 
-	//We must update the VBOs
-	normalsHaveChanged();
+		//we must update the VBOs
+		normalsHaveChanged();
+	}
 }
 
 void ccPointCloud::swapPoints(unsigned firstIndex, unsigned secondIndex)
