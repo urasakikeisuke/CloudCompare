@@ -64,12 +64,12 @@ void CApp::LoadFeature(const Points& pts, const Features& feat)
 template <typename T>
 static fgr::KDTree BuildKDTree(const vector<T>& data)
 {
-	const int rows = static_cast<int>(data.size());
-	const int dim = static_cast<int>(data.front().size());
+	const size_t rows = data.size();
+	const size_t dim = data.front().size();
 
 	Distances dataset(rows * dim);
-	for (int i = 0; i < rows; i++)
-		for (int j = 0; j < dim; j++)
+	for (size_t i = 0; i < rows; i++)
+		for (size_t j = 0; j < dim; j++)
 			dataset[i * dim + j] = static_cast<float>(data[i][j]);
 
 	flann::Matrix<float> dataset_mat(dataset.data(), rows, dim);
@@ -187,6 +187,7 @@ void CApp::AdvancedMatching(bool crossCheck/*=true*/, bool tupleConstraint/*=tru
 				corres.push_back(Pair(nearestIndexInC1, indexInC2));
 			}
 		}
+
 		corres.shrink_to_fit();
 	}
 
@@ -213,10 +214,14 @@ void CApp::AdvancedMatching(bool crossCheck/*=true*/, bool tupleConstraint/*=tru
 			size_t rand0 = (static_cast<size_t>(rand()) % ncorr);
 			size_t rand1 = (static_cast<size_t>(rand()) % ncorr);
 			if (rand1 == rand0)
+			{
 				continue;
+			}
 			size_t rand2 = (static_cast<size_t>(rand()) % ncorr);
 			if (rand2 == rand0 || rand2 == rand1)
+			{
 				continue;
+			}
 
 			const Pair& pair0 = corres[rand0];
 			const Pair& pair1 = corres[rand1];
@@ -242,7 +247,9 @@ void CApp::AdvancedMatching(bool crossCheck/*=true*/, bool tupleConstraint/*=tru
 				corres_tuple.push_back(Pair(pair2.first, pair2.second));
 
 				if (++cnt >= tuple_max_cnt_)
+				{
 					break;
+				}
 			}
 		}
 		corres_tuple.shrink_to_fit();

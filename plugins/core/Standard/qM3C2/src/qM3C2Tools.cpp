@@ -658,7 +658,7 @@ bool qM3C2Tools::GuessBestParams(	ccPointCloud* cloud1,
 			double sumPopulation = 0;
 			double sumPopulation2 = 0;
 			unsigned validLSPlanes = 0;
-			double sumRoughness = 0;
+			double sumSquareRoughness = 0;
 			CCVector3d meanNormal(0, 0, 0);
 			for (unsigned i = 0; i < probingCount; ++i)
 			{
@@ -699,7 +699,7 @@ bool qM3C2Tools::GuessBestParams(	ccPointCloud* cloud1,
 						ScalarType d = CCCoreLib::DistanceComputationTools::computePoint2PlaneDistance(P, lsPlane);
 						//we compute relative roughness
 						d /= radius;
-						sumRoughness += d*d;//std::abs(d);
+						sumSquareRoughness += static_cast<double>(d)*d;
 						meanNormal += CCVector3d::fromArray(lsPlane);
 						validLSPlanes++;
 					}
@@ -731,7 +731,7 @@ bool qM3C2Tools::GuessBestParams(	ccPointCloud* cloud1,
 				if (!hasBestProjLevel)
 				{
 					std::sort(populations.begin(), populations.begin() + probingCount);
-					unsigned pop97 = populations[static_cast<unsigned>(floor(probingCount * 0.03))];
+					unsigned pop97 = populations[static_cast<unsigned>(probingCount * 0.03)]; //static_cast is equivalent to floor if value >= 0
 					if (app)
 						app->dispToConsole(QString("[M3C2::auto] \t97% of cells above: %1 +/- %2").arg(pop97));
 					if (pop97 /*meanPopulation - 2 * stdDevPopulation*/ >= minPoints4Stats)
@@ -749,7 +749,7 @@ bool qM3C2Tools::GuessBestParams(	ccPointCloud* cloud1,
 				if (app)
 					app->dispToConsole(QString("[M3C2::auto] \tValid normals: %1/%2").arg(validLSPlanes).arg(probingCount));
 
-				double meanRoughness = sqrt(sumRoughness / static_cast<double>(std::max<unsigned>(validLSPlanes, 1)));
+				double meanRoughness = sqrt(sumSquareRoughness / std::max<unsigned>(validLSPlanes, 1));
 				if (app)
 					app->dispToConsole(QString("[M3C2::auto] \tMean relative roughness: %1").arg(meanRoughness));
 

@@ -80,7 +80,7 @@ CC_FILE_ERROR PcdFilter::saveToFile(ccHObject* entity, const QString& filename, 
 	}
 
 	//search for a sensor as child (we take the first if there are several of them)
-	ccSensor* sensor(nullptr);
+	ccSensor* sensor = nullptr;
 	{
 		for (unsigned i = 0; i < ccCloud->getChildrenNumber(); ++i)
 		{
@@ -89,16 +89,24 @@ CC_FILE_ERROR PcdFilter::saveToFile(ccHObject* entity, const QString& filename, 
 			//try to cast to a ccSensor
 			sensor = ccHObjectCaster::ToSensor(child);
 			if (sensor)
+			{
 				break;
+			}
 		}
 	}
 
 	const CCVector3d& globalShift = ccCloud->getGlobalShift();
 
+	if (ccCloud->getGlobalScale() != 1.0)
+	{
+		ccLog::Warning("[PCD] Can't restore the Global scale when exporting to PCD format");
+	}
+
 	Eigen::Vector4f pos = Eigen::Vector4f::Zero();
 	Eigen::Quaternionf ori = Eigen::Quaternionf::Identity();
 	PCLCloud::Ptr pclCloud;
 
+	bool customShift = false;
 	if (sensor)
 	{
 		//get sensor data
@@ -111,16 +119,7 @@ CC_FILE_ERROR PcdFilter::saveToFile(ccHObject* entity, const QString& filename, 
 		CCVector3 bbMin, bbMax;
 		ccCloud->getBoundingBox(bbMin, bbMax);
 		CCVector3 bbCenter = (bbMin + bbMax) / 2.0;
-		if (ccGlobalShiftManager::NeedShift(trans - bbCenter))
-		{
-			ccLog::Warning("Sensor center is too far from the points. Can't restore it without losing numerical accuracy...");
-			pclCloud = cc2smReader(ccCloud).getAsSM();
-
-			pos(0) = -static_cast<float>(globalShift.x);
-			pos(1) = -static_cast<float>(globalShift.y);
-			pos(2) = -static_cast<float>(globalShift.z);
-		}
-		else
+		if (!ccGlobalShiftManager::NeedShift(trans - bbCenter))
 		{
 			pos(0) = trans.x;
 			pos(1) = trans.y;
@@ -148,14 +147,24 @@ CC_FILE_ERROR PcdFilter::saveToFile(ccHObject* entity, const QString& filename, 
 			pos(0) = static_cast<float>(pos(0) - globalShift.x);
 			pos(1) = static_cast<float>(pos(1) - globalShift.y);
 			pos(2) = static_cast<float>(pos(2) - globalShift.z);
+			customShift = true;
 
 			delete tempCloud;
 			tempCloud = nullptr;
 		}
+		else
+		{
+			ccLog::Warning("Sensor center is too far from the points. Can't restore it without losing numerical accuracy...");
+		}
 	}
-	else
+
+	if (!customShift)
 	{
 		pclCloud = cc2smReader(ccCloud).getAsSM();
+
+		pos(0) = -static_cast<float>(globalShift.x);
+		pos(1) = -static_cast<float>(globalShift.y);
+		pos(2) = -static_cast<float>(globalShift.z);
 	}
 	
 	if (!pclCloud)
@@ -174,7 +183,15 @@ CC_FILE_ERROR PcdFilter::saveToFile(ccHObject* entity, const QString& filename, 
 		stream << QString(p.generateHeaderBinary(*pclCloud, pos, ori).c_str()) << "DATA binary\n";
 		return CC_FERR_NO_ERROR;
 	}
-	if (pcl::io::savePCDFile( qPrintable(filename), *pclCloud, pos, ori, true) < 0) //DGM: warning, toStdString doesn't preserve "local" characters
+
+	try
+	{
+		if (pcl::io::savePCDFile(qPrintable(filename), *pclCloud, pos, ori, true) < 0) //DGM: warning, toStdString doesn't preserve "local" characters
+		{
+			return CC_FERR_THIRD_PARTY_LIB_FAILURE;
+		}
+	}
+	catch (...)
 	{
 		return CC_FERR_THIRD_PARTY_LIB_FAILURE;
 	}
@@ -259,7 +276,7 @@ CC_FILE_ERROR PcdFilter::loadFile(const QString& filename, ccHObject& container,
 					grid.reset(new ccPointCloud::Grid);
 					grid->h = static_cast<unsigned>(inputCloud->height);
 					grid->w = static_cast<unsigned>(inputCloud->width);
-					grid->indexes.resize(grid->h * grid->w);
+					grid->indexes.resize(static_cast<size_t>(grid->h) * grid->w);
 					grid->minValidIndex = 0;
 					grid->maxValidIndex = pointCount;
 					grid->validCount = pointCount;
@@ -280,7 +297,7 @@ CC_FILE_ERROR PcdFilter::loadFile(const QString& filename, ccHObject& container,
 						grid.reset(new ccPointCloud::Grid);
 						grid->h = static_cast<unsigned>(inputCloud->height);
 						grid->w = static_cast<unsigned>(inputCloud->width);
-						grid->indexes.resize(grid->h * grid->w, -1);
+						grid->indexes.resize(static_cast<size_t>(grid->h) * grid->w, -1);
 						grid->validCount = 0;
 						grid->minValidIndex = pointCount;
 						grid->maxValidIndex = 0;
